@@ -1,0 +1,3 @@
+# Never commit your real financial data
+*.json
+.DS_Store

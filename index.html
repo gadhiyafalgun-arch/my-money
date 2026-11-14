@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>My Money</title>
+<style>
+:root{
+  --bg:#f4f5f7;--card:#fff;--ink:#14171f;--muted:#6b7280;--line:#e5e7eb;
+  --accent:#2f6fed;--good:#15803d;--warn:#b45309;--bad:#b91c1c;
+  --goodbg:#e8f5ec;--warnbg:#fdf3e2;--badbg:#fcebea;--radius:14px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0e1117;--card:#171b23;--ink:#e8eaf0;--muted:#9aa3b2;--line:#262c38;
+  --accent:#6d9cff;--good:#4ade80;--warn:#fbbf24;--bad:#f87171;
+  --goodbg:#12261a;--warnbg:#2a2110;--badbg:#2c1515;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{padding:calc(14px + env(safe-area-inset-top)) 18px 6px;display:flex;justify-content:space-between;align-items:baseline}
+header h1{font-size:22px;margin:0}
+header .month{color:var(--muted);font-size:14px}
+main{max-width:720px;margin:0 auto;padding:6px 14px calc(90px + env(safe-area-inset-bottom))}
+section.view{display:none}section.view.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin:10px 0}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px;font-weight:600}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0}
+.row+.row{border-top:1px solid var(--line)}
+.big{font-size:32px;font-weight:700;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.stat .v{font-size:20px;font-weight:700}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin:8px 0 2px}
+.bar>i{display:block;height:100%;border-radius:6px;background:var(--accent);transition:width .3s}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.good{background:var(--goodbg)}.pill.warn{background:var(--warnbg)}.pill.bad{background:var(--badbg)}
+.pill.muted{background:var(--line);color:var(--muted)}
+button,.btn{font:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+button.small{padding:6px 10px;font-size:13px}
+input,select,textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.check{display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer}
+.check+.check{border-top:1px solid var(--line)}
+.box{width:26px;height:26px;border-radius:8px;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:16px;color:#fff}
+.check.done .box{background:var(--good);border-color:var(--good)}
+.check.done .name{text-decoration:line-through;color:var(--muted)}
+.check .grow{flex:1;min-width:0}
+.name{font-weight:600}
+.cc{padding:14px 16px}
+.cc .top{display:flex;justify-content:space-between;align-items:baseline}
+.cc .nums{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;margin-top:4px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:5}
+nav button{background:none;color:var(--muted);flex:1;padding:6px 2px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button svg{width:22px;height:22px}
+nav button.active{color:var(--accent)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.modal.open{display:flex}
+.sheet{background:var(--card);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.sheet h3{margin:0 0 6px}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.actions button{flex:1}
+.quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.quick button{background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:7px 11px;font-size:13px;font-weight:500}
+.quick button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.empty{color:var(--muted);text-align:center;padding:18px 0}
+.notice{background:var(--warnbg);border-radius:10px;padding:10px 12px;font-size:13px;margin:10px 0}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+.step{display:flex;gap:12px;padding:8px 0}
+.step .n{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.welcome{text-align:center;padding:30px 10px}
+.welcome .actions{flex-direction:column}
+</style>
+</head>
+<body>
+<header><h1>My Money</h1><span class="month" id="monthLabel"></span></header>
+<main>
+  <div id="storageWarn" class="notice" style="display:none">This browser isn't saving data. Use Data → Export before you close the page.</div>
+
+  <!-- HOME -->
+  <section class="view active" id="v-home">
+    <div id="welcome" class="card welcome" style="display:none">
+      <h3>Welcome</h3>
+      <p class="sub">Your numbers are saved only in this browser. Load your data file, or start empty and type them in.</p>
+      <div class="actions">
+        <button onclick="openImport()">Load my data file</button>
+        <button class="ghost" onclick="startBlank()">Start empty</button>
+      </div>
+    </div>
+    <div id="homeBody">
+      <div class="card">
+        <h2>Left over this month</h2>
+        <div class="big" id="leftover">$0</div>
+        <div class="sub" id="leftoverSub"></div>
+        <div class="bar"><i id="ratioBar"></i></div>
+        <div class="row" style="border:0;padding-top:2px"><span class="sub">Expenses vs. income</span><b id="ratioTxt"></b></div>
+      </div>
+      <div class="grid2">
+        <div class="stat"><div class="sub">Income (take-home)</div><div class="v" id="sIncome"></div></div>
+        <div class="stat"><div class="sub">Expenses</div><div class="v" id="sExp"></div></div>
+      </div>
+      <div class="card">
+        <h2>Where it goes</h2>
+        <div class="row"><span>Bills</span><b id="bBills"></b></div>
+        <div class="row"><span>Card minimums</span><b id="bMins"></b></div>
+        <div class="row"><span>Extra spending this month</span><b id="bExtra"></b></div>
+      </div>
+      <div class="card">
+        <h2>Due soon</h2>
+        <div id="dueSoon"></div>
+      </div>
+      <div class="card">
+        <h2>Credit cards</h2>
+        <div class="row"><span>Total owed</span><b id="cTotal"></b></div>
+        <div class="row"><span>Total limit</span><b id="cLimit"></b></div>
+        <div class="row"><span>Overall utilization</span><b id="cUtil"></b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BILLS -->
+  <section class="view" id="v-bills">
+    <div class="card">
+      <h2 id="billsTitle">Bills this month</h2>
+      <div class="sub" style="margin-bottom:6px">Tap the box when paid. Everything resets on the 1st of next month.</div>
+      <div class="bar"><i id="paidBar" style="background:var(--good)"></i></div>
+      <div class="sub" id="paidTxt"></div>
+      <div id="billList"></div>
+    </div>
+    <div class="card">
+      <h2>Edit bills</h2>
+      <div id="billEditList"></div>
+      <div class="actions"><button onclick="editBill()">+ Add bill</button></div>
+    </div>
+  </section>
+
+  <!-- SPEND -->
+  <section class="view" id="v-spend">
+    <div class="card">
+      <h2>Add spending</h2>
+      <label>Amount</label>
+      <input id="exAmt" type="number" inputmode="decimal" step="0.01" placeholder="0.00">
+      <label>Category</label>
+      <div class="quick" id="exCats"></div>
+      <label>Note (optional)</label>
+      <input id="exNote" placeholder="e.g. Walmart">
+      <label>Date</label>
+      <input id="exDate" type="date">
+      <div class="actions"><button onclick="addExpense()">Add</button></div>
+    </div>
+    <div class="card">
+      <h2>This month</h2>
+      <div id="catTotals"></div>
+    </div>
+    <div class="card">
+      <h2>Entries</h2>
+      <div id="exList"></div>
+    </div>
+  </section>
+
+  <!-- CARDS -->
+  <section class="view" id="v-cards">
+    <div id="cardList"></div>
+    <div class="actions"><button onclick="editCard()">+ Add card</button></div>
+    <div class="card">
+      <h2>Payoff plan</h2>
+      <div class="sub">Pay minimums on everything. All extra money goes to the top card until it's gone, then rolls to the next. Use ↑ ↓ to change the order.</div>
+      <label>Extra per month on top of minimums</label>
+      <input id="extraPay" type="number" inputmode="decimal" step="1">
+      <div id="payoff" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- DATA / SETTINGS -->
+  <section class="view" id="v-more">
+    <div class="card">
+      <h2>Income</h2>
+      <label>Weekly pay before taxes ($)</label>
+      <input id="setWeekly" type="number" inputmode="decimal" step="0.01">
+      <label>Estimated tax (%)</label>
+      <input id="setTax" type="number" inputmode="decimal" step="0.1">
+      <label>Or: exact monthly take-home ($, leave empty to use the estimate)</label>
+      <input id="setTake" type="number" inputmode="decimal" step="0.01">
+      <div class="sub" id="incomeCalc" style="margin-top:8px"></div>
+      <div class="actions"><button onclick="saveIncome()">Save income</button></div>
+    </div>
+    <div class="card">
+      <h2>Backup</h2>
+      <div class="sub">Your data lives only in this browser. Export a backup now and then, and use it to move data between your phone and laptop.</div>
+      <div class="actions">
+        <button onclick="exportData()">Export backup</button>
+        <button class="ghost" onclick="openImport()">Import</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Danger zone</h2>
+      <div class="actions"><button class="danger" onclick="confirmBox('Erase everything on this device?', resetAll)">Erase all data</button></div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="active" data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button data-v="bills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/></svg>Bills</button>
+  <button data-v="spend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Spend</button>
+  <button data-v="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Cards</button>
+  <button data-v="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Data</button>
+</nav>
+
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileIn" accept=".json,application/json" style="display:none">
+
+<script>
+/* ---------- storage ---------- */
+const KEY = 'myMoneyDashboard.v1';
+const CATS = ['Groceries','Food out','Gas','Personal','Shopping','Bills','Other'];
+let canStore = true;
+function blank(){
+  return {version:1, income:{weeklyGross:0, taxPercent:12, monthlyTakeHome:null},
+    bills:[], cards:[], expenses:[], paid:{}, payoffExtra:0, payoffOrder:[]};
+}
+let S = null;
+function load(){
+  try{ const raw = localStorage.getItem(KEY); return raw ? normalize(JSON.parse(raw)) : null; }
+  catch(e){ canStore = false; return null; }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch(e){ canStore = false; }
+  document.getElementById('storageWarn').style.display = canStore ? 'none' : 'block';
+}
+function normalize(d){
+  const b = blank();
+  d = Object.assign(b, d||{});
+  d.income = Object.assign(blank().income, d.income||{});
+  ['bills','cards','expenses','payoffOrder'].forEach(k=>{ if(!Array.isArray(d[k])) d[k]=[]; });
+  if(typeof d.paid!=='object'||!d.paid) d.paid={};
+  d.bills.forEach(x=>x.id ||= uid());
+  d.cards.forEach(x=>x.id ||= uid());
+  d.expenses.forEach(x=>x.id ||= uid());
+  return d;
+}
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const money = (n, cents) => (n<0?'-':'') + '$' + Math.abs(n||0).toLocaleString('en-US',{minimumFractionDigits:cents?2:0, maximumFractionDigits:cents?2:0});
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now = () => new Date();
+const monthKey = (d=now()) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const todayStr = () => { const d=now(); return monthKey(d)+'-'+String(d.getDate()).padStart(2,'0'); };
+const daysInMonth = (d=now()) => new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+function ordinal(n){ const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
+
+/* ---------- math ---------- */
+function monthlyIncome(){
+  const i=S.income;
+  if(i.monthlyTakeHome!=null && i.monthlyTakeHome!=='' && !isNaN(i.monthlyTakeHome)) return +i.monthlyTakeHome;
+  return (+i.weeklyGross||0)*52/12*(1-(+i.taxPercent||0)/100);
+}
+const billsTotal = () => S.bills.reduce((a,b)=>a+(+b.amount||0),0);
+const minsTotal  = () => S.cards.filter(c=>(+c.balance||0)>0).reduce((a,c)=>a+(+c.minPayment||0),0);
+const monthExpenses = () => S.expenses.filter(e=>(e.date||'').startsWith(monthKey()));
+const extraTotal = () => monthExpenses().reduce((a,e)=>a+(+e.amount||0),0);
+
+/* due items = bills + card minimums */
+function dueItems(){
+  const items = S.bills.map(b=>({key:'b:'+b.id, name:b.name, amount:+b.amount||0, dueDay:b.dueDay?+b.dueDay:null, note:b.note}));
+  S.cards.filter(c=>(+c.balance||0)>0).forEach(c=>items.push({key:'c:'+c.id, name:c.name+' (card)', amount:+c.minPayment||0, dueDay:c.dueDay?+c.dueDay:null, isCard:true}));
+  return items.sort((a,b)=>(a.dueDay??99)-(b.dueDay??99));
+}
+const paidMap = () => (S.paid[monthKey()] ||= {});
+function dueStatus(it){
+  if(paidMap()[it.key]) return {cls:'good', txt:'Paid'};
+  if(!it.dueDay) return {cls:'muted', txt:'Set due date'};
+  const day = Math.min(it.dueDay, daysInMonth());
+  const diff = day - now().getDate();
+  if(diff<0) return {cls:'bad', txt:'Overdue '+(-diff)+'d'};
+  if(diff===0) return {cls:'bad', txt:'Due today'};
+  if(diff<=5) return {cls:'warn', txt:'In '+diff+'d'};
+  return {cls:'muted', txt:'Due '+ordinal(day)};
+}
+
+/* ---------- render ---------- */
+function render(){
+  const first = !S;
+  $('welcome').style.display = first ? 'block' : 'none';
+  $('homeBody').style.display = first ? 'none' : 'block';
+  $('monthLabel').textContent = now().toLocaleString('en-US',{month:'long', year:'numeric'});
+  if(first) return;
+  renderHome(); renderBills(); renderSpend(); renderCards(); renderSettings();
+}
+
+function renderHome(){
+  const inc = monthlyIncome(), bills=billsTotal(), mins=minsTotal(), extra=extraTotal();
+  const exp = bills+mins+extra, left = inc-exp, ratio = inc>0 ? exp/inc*100 : 0;
+  $('leftover').textContent = money(left);
+  $('leftover').className = 'big ' + (left<0?'bad':left<150?'warn':'good');
+  $('leftoverSub').textContent = left<0 ? 'You are spending more than you make this month.' : 'after bills, card minimums and spending so far';
+  $('ratioBar').style.width = Math.min(ratio,100)+'%';
+  $('ratioBar').style.background = ratio>=100?'var(--bad)':ratio>=85?'var(--warn)':'var(--good)';
+  $('ratioTxt').textContent = ratio.toFixed(1)+'%';
+  $('sIncome').textContent = money(inc);
+  $('sExp').textContent = money(exp);
+  $('bBills').textContent = money(bills);
+  $('bMins').textContent = money(mins);
+  $('bExtra').textContent = money(extra,true);
+  const soon = dueItems().filter(it=>!paidMap()[it.key]).slice(0,5);
+  $('dueSoon').innerHTML = soon.length ? soon.map(it=>{ const s=dueStatus(it);
+    return `<div class="row"><span>${esc(it.name)} <span class="sub">${money(it.amount)}</span></span><span class="pill ${s.cls}">${s.txt}</span></div>`;}).join('')
+    : '<div class="empty">Everything is paid this month 🎉</div>';
+  const owed = S.cards.reduce((a,c)=>a+(+c.balance||0),0), lim=S.cards.reduce((a,c)=>a+(+c.limit||0),0);
+  const u = lim? owed/lim*100 : 0;
+  $('cTotal').textContent = money(owed); $('cLimit').textContent = money(lim);
+  $('cUtil').innerHTML = `<span class="${utilCls(u)}">${u.toFixed(0)}%</span>`;
+}
+const utilCls = u => u>=50?'bad':u>=30?'warn':'good';
+
+function renderBills(){
+  const items = dueItems(), pm = paidMap();
+  const paidCount = items.filter(i=>pm[i.key]).length;
+  const paidAmt = items.filter(i=>pm[i.key]).reduce((a,i)=>a+i.amount,0), totalAmt = items.reduce((a,i)=>a+i.amount,0);
+  $('billsTitle').textContent = 'Bills · ' + now().toLocaleString('en-US',{month:'long'});
+  $('paidBar').style.width = (totalAmt? paidAmt/totalAmt*100 : 0)+'%';
+  $('paidTxt').textContent = `${paidCount} of ${items.length} paid · ${money(paidAmt)} of ${money(totalAmt)}`;
+  $('billList').innerHTML = items.length ? items.map(it=>{ const s=dueStatus(it), done=!!pm[it.key];
+    return `<div class="check ${done?'done':''}" onclick="togglePaid('${it.key}')">
+      <div class="box">${done?'✓':''}</div>
+      <div class="grow"><div class="name">${esc(it.name)}</div><div class="sub">${money(it.amount,true)}${it.note?' · '+esc(it.note):''}</div></div>
+      <span class="pill ${s.cls}">${s.txt}</span></div>`;}).join('') : '<div class="empty">No bills yet.</div>';
+  $('billEditList').innerHTML = S.bills.map(b=>`<div class="row"><span>${esc(b.name)} <span class="sub">${money(b.amount,true)}${b.dueDay?' · '+ordinal(+b.dueDay):''}</span></span><button class="ghost small" onclick="editBill('${b.id}')">Edit</button></div>`).join('') || '<div class="empty">No bills yet.</div>';
+}
+function togglePaid(key){ const pm=paidMap(); if(pm[key]) delete pm[key]; else pm[key]=true; save(); render(); }
+
+let exCat = CATS[0];
+function renderSpend(){
+  $('exCats').innerHTML = CATS.map(c=>`<button class="${c===exCat?'on':''}" onclick="exCat='${c}';renderSpend()">${c}</button>`).join('');
+  if(!$('exDate').value) $('exDate').value = todayStr();
+  const list = monthExpenses().sort((a,b)=>b.date.localeCompare(a.date));
+  const byCat = {}; list.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+(+e.amount||0));
+  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  $('catTotals').innerHTML = cats.length ? cats.map(([c,v])=>`<div class="row"><span>${esc(c)}</span><b>${money(v,true)}</b></div>`).join('')
+    + `<div class="row"><span><b>Total</b></span><b>${money(extraTotal(),true)}</b></div>` : '<div class="empty">Nothing added this month.</div>';
+  $('exList').innerHTML = list.length ? list.map(e=>`<div class="row"><span><span class="name">${money(+e.amount,true)}</span> <span class="sub">${esc(e.category)}${e.note?' · '+esc(e.note):''} · ${e.date.slice(5).replace('-','/')}</span></span><button class="danger small" onclick="delExpense('${e.id}')">✕</button></div>`).join('') : '<div class="empty">—</div>';
+}
+function addExpense(){
+  const amt = parseFloat($('exAmt').value);
+  if(!(amt>0)){ toast('Enter an amount'); return; }
+  S.expenses.push({id:uid(), amount:Math.round(amt*100)/100, category:exCat, note:$('exNote').value.trim(), date:$('exDate').value||todayStr()});
+  $('exAmt').value=''; $('exNote').value='';
+  save(); render(); toast('Added '+money(amt,true));
+}
+function delExpense(id){ S.expenses = S.expenses.filter(e=>e.id!==id); save(); render(); }
+
+function payoffOrder(){
+  const ids = S.cards.map(c=>c.id);
+  let order = S.payoffOrder.filter(id=>ids.includes(id));
+  ids.forEach(id=>{ if(!order.includes(id)) order.push(id); });
+  S.payoffOrder = order; return order;
+}
+function moveCard(id,dir){ const o=payoffOrder(), i=o.indexOf(id), j=i+dir; if(j<0||j>=o.length) return; [o[i],o[j]]=[o[j],o[i]]; save(); renderCards(); }
+
+function simulate(){
+  const order = payoffOrder();
+  const cards = order.map(id=>S.cards.find(c=>c.id===id)).map(c=>({id:c.id,name:c.name,bal:+c.balance||0,apr:(+c.apr||0)/100,min:+c.minPayment||0,done:null}));
+  const budget = cards.filter(c=>c.bal>0).reduce((a,c)=>a+c.min,0) + (+S.payoffExtra||0);
+  let interest=0, m=0;
+  while(cards.some(c=>c.bal>0.005) && m<600){
+    m++; let pool = budget;
+    cards.forEach(c=>{ if(c.bal>0){ const i=c.bal*c.apr/12; c.bal+=i; interest+=i; }});
+    cards.forEach(c=>{ if(c.bal>0){ const p=Math.min(c.min,c.bal,pool); c.bal-=p; pool-=p; }});
+    for(const c of cards){ if(pool<=0) break; if(c.bal>0){ const p=Math.min(c.bal,pool); c.bal-=p; pool-=p; } }
+    cards.forEach(c=>{ if(c.bal<=0.005 && c.done===null){ c.bal=0; c.done=m; }});
+  }
+  return {cards, months: cards.every(c=>c.done!==null) ? m : null, interest, budget};
+}
+function monthName(offset){ const d=now(); d.setDate(1); d.setMonth(d.getMonth()+offset); return d.toLocaleString('en-US',{month:'short',year:'numeric'}); }
+
+function renderCards(){
+  $('cardList').innerHTML = S.cards.length ? S.cards.map(c=>{
+    const bal=+c.balance||0, lim=+c.limit||0, u= lim? bal/lim*100 : 0, s=dueStatus({key:'c:'+c.id,dueDay:c.dueDay?+c.dueDay:null});
+    return `<div class="card cc" onclick="editCard('${c.id}')">
+      <div class="top"><span class="name">${esc(c.name)}</span><span class="${utilCls(u)}" style="font-weight:700">${u.toFixed(0)}% used</span></div>
+      <div class="bar"><i style="width:${Math.min(u,100)}%;background:var(--${utilCls(u)})"></i></div>
+      <div class="nums"><span>${money(bal)} of ${money(lim)}</span><span>${money(lim-bal)} available</span></div>
+      <div class="nums"><span>Min ${money(+c.minPayment||0)}${c.apr?' · '+c.apr+'% APR':''}</span><span class="pill ${bal>0?s.cls:'good'}">${bal>0?s.txt:'Paid off'}</span></div>
+    </div>`;}).join('') : '<div class="card empty">No cards yet.</div>';
+  if(document.activeElement!==$('extraPay')) $('extraPay').value = S.payoffExtra||0;
+  if(!S.cards.length){ $('payoff').innerHTML=''; return; }
+  const sim = simulate();
+  const order = payoffOrder();
+  $('payoff').innerHTML = order.map((id,i)=>{ const c=S.cards.find(x=>x.id===id), r=sim.cards.find(x=>x.id===id);
+    const when = (+c.balance||0)<=0 ? 'Paid off' : r.done ? 'Paid off ~'+monthName(r.done)+' ('+r.done+' mo)' : 'Not paid off at this rate';
+    return `<div class="step"><div class="n">${i+1}</div><div class="grow" style="flex:1"><div class="name">${esc(c.name)} <span class="sub">${money(+c.balance||0)}</span></div><div class="sub">${when}</div></div>
+      <button class="ghost small" onclick="moveCard('${id}',-1)">↑</button><button class="ghost small" onclick="moveCard('${id}',1)">↓</button></div>`;}).join('')
+    + `<div class="row" style="margin-top:6px"><span>Paying per month</span><b>${money(sim.budget)}</b></div>`
+    + `<div class="row"><span>Debt-free</span><b>${sim.months? monthName(sim.months)+' ('+sim.months+' mo)' : 'Never at this rate'}</b></div>`
+    + `<div class="row"><span>Interest paid along the way</span><b>${money(sim.interest)}</b></div>`
+    + (S.cards.some(c=>!c.apr && (+c.balance||0)>0) ? '<div class="notice">Some cards have no APR entered, so interest is undercounted. Tap a card to add it.</div>' : '');
+}
+$('extraPay').addEventListener('input', e=>{ S.payoffExtra = Math.max(0, parseFloat(e.target.value)||0); save(); renderCards(); });
+
+function renderSettings(){
+  const i=S.income;
+  $('setWeekly').value = i.weeklyGross||''; $('setTax').value = i.taxPercent??''; $('setTake').value = i.monthlyTakeHome??'';
+  const gross = (+i.weeklyGross||0)*52/12;
+  $('incomeCalc').innerHTML = `Monthly before tax: <b>${money(gross)}</b> (avg month) · Estimated take-home: <b>${money(gross*(1-(+i.taxPercent||0)/100))}</b><br>Dashboard uses: <b>${money(monthlyIncome())}</b>`;
+}
+function saveIncome(){
+  S.income.weeklyGross = parseFloat($('setWeekly').value)||0;
+  S.income.taxPercent = parseFloat($('setTax').value)||0;
+  const t = $('setTake').value.trim(); S.income.monthlyTakeHome = t===''?null:parseFloat(t);
+  save(); render(); toast('Income saved');
+}
+
+/* ---------- modals ---------- */
+function openModal(html){ $('sheet').innerHTML=html; $('modal').classList.add('open'); }
+function closeModal(){ $('modal').classList.remove('open'); }
+function confirmBox(msg, fn){
+  window._confirmFn = fn;
+  openModal(`<h3>${esc(msg)}</h3><div class="actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="danger" onclick="closeModal();window._confirmFn()">Yes</button></div>`);
+}
+function dayOptions(sel){ let o='<option value="">Not set</option>'; for(let d=1; d<=31; d++) o+=`<option value="${d}" ${+sel===d?'selected':''}>${ordinal(d)}</option>`; return o; }
+
+function editBill(id){
+  const b = S.bills.find(x=>x.id===id) || {name:'',amount:'',dueDay:'',note:''};
+  openModal(`<h3>${id?'Edit':'Add'} bill</h3>
+    <label>Name</label><input id="fName" value="${esc(b.name)}" placeholder="Rent">
+    <label>Amount per month ($)</label><input id="fAmt" type="number" inputmode="decimal" step="0.01" value="${b.amount}">
+    <label>Due day of month</label><select id="fDue">${dayOptions(b.dueDay)}</select>
+    <label>Note (optional)</label><input id="fNote" value="${esc(b.note||'')}">
+    <div class="actions">${id?`<button class="danger" onclick="delBill('${id}')">Delete</button>`:''}<button class="ghost" onclick="closeModal()">Cancel</button><button onclick="saveBill('${id||''}')">Save</button></div>`);
+}
+function saveBill(id){
+  const name=$('fName').value.trim(); if(!name){ toast('Enter a name'); return; }
+  const data={name, amount:parseFloat($('fAmt').value)||0, dueDay:$('fDue').value?+$('fDue').value:null, note:$('fNote').value.trim()};
+  if(id) Object.assign(S.bills.find(x=>x.id===id), data); else S.bills.push({id:uid(), ...data});
+  save(); closeModal(); render();
+}
+function delBill(id){ S.bills=S.bills.filter(x=>x.id!==id); save(); closeModal(); render(); }
+
+function editCard(id){
+  const c = S.cards.find(x=>x.id===id) || {name:'',balance:'',limit:'',minPayment:'',apr:'',dueDay:''};
+  openModal(`<h3>${id?'Edit':'Add'} card</h3>
+    <div class="sub">Balances and dates only. Never enter card numbers here.</div>
+    <label>Card name</label><input id="fName" value="${esc(c.name)}" placeholder="Discover">
+    <div class="grid2"><div><label>Balance ($)</label><input id="fBal" type="number" inputmode="decimal" step="0.01" value="${c.balance}"></div>
+    <div><label>Limit ($)</label><input id="fLim" type="number" inputmode="decimal" step="0.01" value="${c.limit}"></div></div>
+    <div class="grid2"><div><label>Minimum payment ($)</label><input id="fMin" type="number" inputmode="decimal" step="0.01" value="${c.minPayment}"></div>
+    <div><label>APR (%)</label><input id="fApr" type="number" inputmode="decimal" step="0.01" value="${c.apr??''}"></div></div>
+    <label>Due day of month</label><select id="fDue">${dayOptions(c.dueDay)}</select>
+    <div class="actions">${id?`<button class="danger" onclick="delCard('${id}')">Delete</button>`:''}<button class="ghost" onclick="closeModal()">Cancel</button><button onclick="saveCard('${id||''}')">Save</button></div>`);
+}
+function saveCard(id){
+  const name=$('fName').value.trim(); if(!name){ toast('Enter a name'); return; }
+  const data={name, balance:parseFloat($('fBal').value)||0, limit:parseFloat($('fLim').value)||0, minPayment:parseFloat($('fMin').value)||0,
+    apr:$('fApr').value===''?null:parseFloat($('fApr').value), dueDay:$('fDue').value?+$('fDue').value:null};
+  if(id) Object.assign(S.cards.find(x=>x.id===id), data); else S.cards.push({id:uid(), ...data});
+  save(); closeModal(); render();
+}
+function delCard(id){ S.cards=S.cards.filter(x=>x.id!==id); save(); closeModal(); render(); }
+
+/* ---------- import / export ---------- */
+function exportData(){
+  const json = JSON.stringify(S, null, 2);
+  try{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    a.download='my-money-backup-'+todayStr()+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
+  openModal(`<h3>Backup</h3><div class="sub">If no file downloaded, tap Copy and paste this into a note or email to yourself.</div>
+    <textarea id="exportBox" readonly>${esc(json)}</textarea>
+    <div class="actions"><button class="ghost" onclick="closeModal()">Close</button><button onclick="copyExport()">Copy</button></div>`);
+}
+async function copyExport(){
+  try{ await navigator.clipboard.writeText($('exportBox').value); toast('Copied'); }
+  catch(e){ $('exportBox').select(); toast('Select all and copy'); }
+}
+function openImport(){
+  openModal(`<h3>Import data</h3><div class="sub">Pick your .json file, or paste its contents. This replaces what's on this device.</div>
+    <div class="actions"><button onclick="$('fileIn').click()">Choose file</button></div>
+    <label>Or paste here</label><textarea id="importBox" placeholder='{"version":1, ...}'></textarea>
+    <div class="actions"><button class="ghost" onclick="closeModal()">Cancel</button><button onclick="importText($('importBox').value)">Import pasted</button></div>`);
+}
+$('fileIn').addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>importText(r.result); r.readAsText(f); e.target.value='';
+});
+function importText(txt){
+  try{ const d=JSON.parse(txt); if(typeof d!=='object'||!d) throw 0; S=normalize(d); save(); closeModal(); render(); toast('Data loaded'); }
+  catch(e){ toast("That doesn't look like a valid data file"); }
+}
+function startBlank(){ S=blank(); save(); render(); go('more'); toast('Start with your income'); }
+function resetAll(){ try{ localStorage.removeItem(KEY); }catch(e){} S=null; render(); go('home'); }
+
+/* ---------- nav ---------- */
+function go(v){
+  document.querySelectorAll('section.view').forEach(s=>s.classList.toggle('active', s.id==='v-'+v));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===v));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{ if(!S && b.dataset.v!=='home'){ toast('Load or start your data first'); return; } go(b.dataset.v); }));
+
+/* re-render when the month changes while the page is open */
+let lastMonth = monthKey();
+setInterval(()=>{ if(monthKey()!==lastMonth){ lastMonth=monthKey(); render(); } }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) render(); });
+
+S = load();
+if(!canStore) $('storageWarn').style.display='block';
+render();
+</script>
+</body>
+</html>

@@ -78,10 +78,12 @@ nav button.active{color:var(--accent)}
 textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .welcome{text-align:center;padding:30px 10px}
 .welcome .actions{flex-direction:column}
+.sync{font-size:12px;font-weight:600;margin-left:6px}
+.sync.ok{color:var(--good)}.sync.busy{color:var(--muted)}.sync.err{color:var(--bad)}
 </style>
 </head>
 <body>
-<header><h1>My Money</h1><span class="month" id="monthLabel"></span></header>
+<header><h1>My Money</h1><span class="month"><span id="monthLabel"></span> <span id="syncStatus" class="sync"></span></span></header>
 <main>
   <div id="storageWarn" class="notice" style="display:none">This browser isn't saving data. Use Data → Export before you close the page.</div>
 
@@ -89,9 +91,10 @@ textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12p
   <section class="view active" id="v-home">
     <div id="welcome" class="card welcome" style="display:none">
       <h3>Welcome</h3>
-      <p class="sub">Your numbers are saved only in this browser. Load your data file, or start empty and type them in.</p>
+      <p class="sub">Connect your private GitHub data repo to load your numbers and keep every device in sync.</p>
       <div class="actions">
-        <button onclick="openImport()">Load my data file</button>
+        <button onclick="openConnect()">Connect GitHub</button>
+        <button class="ghost" onclick="openImport()">Load a data file instead</button>
         <button class="ghost" onclick="startBlank()">Start empty</button>
       </div>
     </div>
@@ -193,8 +196,13 @@ textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12p
       <div class="actions"><button onclick="saveIncome()">Save income</button></div>
     </div>
     <div class="card">
+      <h2>GitHub sync</h2>
+      <div class="sub" id="ghInfo"></div>
+      <div class="actions" id="ghActions"></div>
+    </div>
+    <div class="card">
       <h2>Backup</h2>
-      <div class="sub">Your data lives only in this browser. Export a backup now and then, and use it to move data between your phone and laptop.</div>
+      <div class="sub">Optional extra copy as a file. With GitHub sync on, every save is already kept in your repo's history.</div>
       <div class="actions">
         <button onclick="exportData()">Export backup</button>
         <button class="ghost" onclick="openImport()">Import</button>
@@ -202,7 +210,7 @@ textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12p
     </div>
     <div class="card">
       <h2>Danger zone</h2>
-      <div class="actions"><button class="danger" onclick="confirmBox('Erase everything on this device?', resetAll)">Erase all data</button></div>
+      <div class="actions"><button class="danger" onclick="confirmBox('Remove your data and token from this device? Your GitHub copy is not touched.', resetAll)">Erase from this device</button></div>
     </div>
   </section>
 </main>
@@ -233,11 +241,101 @@ function load(){
   try{ const raw = localStorage.getItem(KEY); return raw ? normalize(JSON.parse(raw)) : null; }
   catch(e){ canStore = false; return null; }
 }
-function save(){
+function localSave(){
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }
   catch(e){ canStore = false; }
-  document.getElementById('storageWarn').style.display = canStore ? 'none' : 'block';
+  document.getElementById('storageWarn').style.display = (canStore || gh) ? 'none' : 'block';
 }
+function save(){ localSave(); if(gh){ setUnsynced(true); schedulePush(); } }
+
+/* ---------- GitHub sync ----------
+   Data lives in a private repo as data.json. The token is stored only in this browser. */
+const GH_KEY = 'myMoneyDashboard.github';
+const DEFAULT_REPO = 'gadhiyafalgun-arch/my-money-data';
+let gh = null, pushTimer = null, pushing = false, again = false;
+try{ gh = JSON.parse(localStorage.getItem(GH_KEY)) || null; }catch(e){}
+const saveGh = () => { try{ gh ? localStorage.setItem(GH_KEY, JSON.stringify(gh)) : localStorage.removeItem(GH_KEY); }catch(e){} };
+const isUnsynced = () => { try{ return localStorage.getItem(KEY+'.unsynced')==='1'; }catch(e){ return false; } };
+const setUnsynced = v => { try{ localStorage.setItem(KEY+'.unsynced', v?'1':'0'); }catch(e){} };
+const b64enc = s => btoa(unescape(encodeURIComponent(s)));
+const b64dec = s => decodeURIComponent(escape(atob(s.replace(/\s/g,''))));
+function setSync(cls, txt){ const el=$('syncStatus'); el.className='sync '+cls; el.textContent=txt; }
+function ghReq(path, opts={}){
+  return fetch('https://api.github.com/repos/'+gh.repo+path, Object.assign({cache:'no-store'}, opts, {headers:{
+    'Authorization':'Bearer '+gh.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'}}));
+}
+const fileUrl = () => '/contents/'+gh.path.split('/').map(encodeURIComponent).join('/');
+function ghError(status){
+  if(status===401) return 'Token expired or wrong';
+  if(status===403||status===404) return "Token can't reach the repo";
+  return 'Not synced';
+}
+async function ghPull(){
+  const r = await ghReq(fileUrl());
+  if(r.status===404) return null;
+  if(!r.ok) throw {status:r.status};
+  const j = await r.json(); gh.sha = j.sha; saveGh();
+  return JSON.parse(b64dec(j.content));
+}
+async function ghPush(){
+  pushTimer = null;
+  if(!gh || !S) return;
+  if(pushing){ again = true; return; }
+  pushing = true; again = false; setSync('busy','Saving…');
+  const put = () => ghReq(fileUrl(), {method:'PUT', body:JSON.stringify(Object.assign(
+    {message:'Update '+new Date().toLocaleString('en-US'), content:b64enc(JSON.stringify(S,null,2))}, gh.sha?{sha:gh.sha}:{}))});
+  try{
+    let r = await put();
+    if(r.status===409 || r.status===422){            // file changed elsewhere: this device's latest wins
+      const g = await ghReq(fileUrl());
+      gh.sha = g.ok ? (await g.json()).sha : null;
+      r = await put();
+    }
+    if(!r.ok) throw {status:r.status};
+    gh.sha = (await r.json()).content.sha; saveGh();
+    setUnsynced(false); setSync('ok','Synced ✓');
+  }catch(e){ setSync('err', e.status ? ghError(e.status) : 'Offline · saved on device'); }
+  finally{ pushing = false; if(again) schedulePush(); }
+}
+function schedulePush(){ setSync('busy','Saving…'); clearTimeout(pushTimer); pushTimer = setTimeout(ghPush, 1200); }
+async function ghRefresh(){
+  if(!gh || pushing || pushTimer) return;
+  if(isUnsynced() && S){ ghPush(); return; }         // changes made offline go up first
+  setSync('busy','Loading…');
+  try{
+    const d = await ghPull();
+    if(d){ S = normalize(d); localSave(); render(); }
+    else if(S){ await ghPush(); return; }            // empty repo: upload what's here
+    setSync('ok','Synced ✓');
+  }catch(e){ setSync('err', e.status ? ghError(e.status) : 'Offline · showing saved copy'); }
+}
+function openConnect(){
+  openModal(`<h3>Connect GitHub</h3>
+    <div class="sub">Paste the token you made for your data repo. It stays in this browser only.</div>
+    <label>Data repo (owner/name)</label><input id="ghRepo" value="${esc(gh?.repo||DEFAULT_REPO)}" autocapitalize="off" autocorrect="off">
+    <label>Token</label><input id="ghToken" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off">
+    <div class="sub" id="ghMsg" style="margin-top:8px"></div>
+    <div class="actions"><button class="ghost" onclick="closeModal()">Cancel</button><button id="ghGo" onclick="connectGh()">Connect</button></div>`);
+}
+async function connectGh(){
+  const repo=$('ghRepo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/$/,''), token=$('ghToken').value.trim();
+  if(!repo.includes('/') || !token){ $('ghMsg').textContent='Fill in both boxes.'; return; }
+  $('ghGo').disabled=true; $('ghMsg').textContent='Checking…';
+  const prev = gh; gh = {repo, token, path:'data.json', sha:null};
+  try{
+    const r = await ghReq('');
+    if(!r.ok) throw {status:r.status};
+    const d = await ghPull();
+    saveGh(); setUnsynced(false);
+    if(d){ S = normalize(d); localSave(); }
+    else { S = S || blank(); localSave(); await ghPush(); }
+    closeModal(); render(); setSync('ok','Synced ✓'); toast(d ? 'Connected · data loaded' : 'Connected');
+  }catch(e){
+    gh = prev; $('ghGo').disabled=false;
+    $('ghMsg').innerHTML = '<span class="bad">'+(e.status ? ghError(e.status) : "Couldn't reach GitHub. Check your internet.")+'</span>';
+  }
+}
+function disconnectGh(){ gh=null; saveGh(); setSync('',''); render(); toast('Disconnected on this device'); }
 function normalize(d){
   const b = blank();
   d = Object.assign(b, d||{});
@@ -411,6 +509,12 @@ function renderCards(){
 $('extraPay').addEventListener('input', e=>{ S.payoffExtra = Math.max(0, parseFloat(e.target.value)||0); save(); renderCards(); });
 
 function renderSettings(){
+  $('ghInfo').innerHTML = gh
+    ? `Connected to <b>${esc(gh.repo)}</b>. Every change saves there automatically, and this page reloads the latest copy each time you open it.`
+    : 'Not connected. Your data is only in this browser right now.';
+  $('ghActions').innerHTML = gh
+    ? `<button class="ghost" onclick="ghRefresh()">Reload from GitHub</button><button class="danger" onclick="disconnectGh()">Disconnect</button>`
+    : `<button onclick="openConnect()">Connect GitHub</button>`;
   const i=S.income;
   $('setWeekly').value = i.weeklyGross||''; $('setTax').value = i.taxPercent??''; $('setTake').value = i.monthlyTakeHome??'';
   const gross = (+i.weeklyGross||0)*52/12;
@@ -502,7 +606,7 @@ function importText(txt){
   catch(e){ toast("That doesn't look like a valid data file"); }
 }
 function startBlank(){ S=blank(); save(); render(); go('more'); toast('Start with your income'); }
-function resetAll(){ try{ localStorage.removeItem(KEY); }catch(e){} S=null; render(); go('home'); }
+function resetAll(){ try{ localStorage.removeItem(KEY); localStorage.removeItem(KEY+'.unsynced'); }catch(e){} gh=null; saveGh(); setSync('',''); S=null; render(); go('home'); }
 
 /* ---------- nav ---------- */
 function go(v){
@@ -515,11 +619,12 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
 /* re-render when the month changes while the page is open */
 let lastMonth = monthKey();
 setInterval(()=>{ if(monthKey()!==lastMonth){ lastMonth=monthKey(); render(); } }, 60000);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) render(); });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ render(); ghRefresh(); } });
 
 S = load();
-if(!canStore) $('storageWarn').style.display='block';
+if(!canStore && !gh) $('storageWarn').style.display='block';
 render();
+ghRefresh();
 </script>
 </body>
 </html>
